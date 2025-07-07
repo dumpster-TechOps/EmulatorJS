@@ -103,7 +103,7 @@
     config.defaultOptions = window.EJS_defaultOptions;
     config.gamePatchUrl = window.EJS_gamePatchUrl;
     config.gameParentUrl = window.EJS_gameParentUrl;
-    config.netplayUrl = window.EJS_netplayServer;
+    config.netplayUrl = window.EJS_netplayUrl;
     config.gameId = window.EJS_gameID;
     config.backgroundImg = window.EJS_backgroundImage;
     config.backgroundBlur = window.EJS_backgroundBlur;
@@ -122,6 +122,10 @@
     config.noAutoFocus = window.EJS_noAutoFocus;
     config.videoRotation = window.EJS_videoRotation;
     config.hideSettings = window.EJS_hideSettings;
+    config.netplayToken = window.EJS_netplayToken;
+    config.netplayName = window.EJS_netplayName;
+    config.netplayGuid = window.EJS_netplayGuid;
+    config.netplaySpectator = window.EJS_netplaySpectator;
     config.shaders = Object.assign({}, window.EJS_SHADERS, window.EJS_shaders ? window.EJS_shaders : {});
 
     let systemLang;

@@ -120,6 +120,86 @@ Read the [minifying](minify/README.md) documentation for more info.
 
 <br>
 
+### Netplay Server
+
+A Socket.IO based relay server allows multiple netplay sessions. Start it with:
+
+```sh
+npm run netplay
+```
+
+
+#### Configuration
+
+Set these environment variables before launching:
+
+- **`PORT`** – listening port (default `8080`)
+- **`API_KEY`** – secret for issuing JWT tokens
+- **`ADMIN_KEY`** – key required for the management API
+
+Example:
+
+```sh
+API_KEY=mysecret ADMIN_KEY=admin123 PORT=9000 npm run netplay
+```
+
+#### Obtaining a token
+
+Get a one-day token using the API key:
+
+```sh
+curl -X POST -H "x-api-key: mysecret" http://localhost:9000/token
+```
+
+Use the returned token when connecting:
+
+```js
+io("http://localhost:9000", { auth: { token: "<JWT>" } })
+```
+
+#### Features
+
+- Password protected rooms and privacy modes (`public`, `friends-only`, `private`)
+- Limit players and viewers with `maxPlayers` and `maxViewers`
+- Allow specific GUIDs to join using `allowedUsers`
+- Query room and player info via HTTP API
+- One-day JWT tokens so the API key itself never reaches the client
+- Join rooms as a viewer without taking a player slot
+
+#### WebSocket events
+
+- `create-room` – `{roomId, password?, privacy?, maxPlayers?, maxViewers?, allowedUsers?, name, guid}`
+- `join-room` – `{roomId, password?, spectator?, name, guid}` (set `spectator` to `true` to join as viewer)
+- `list-rooms` – returns all rooms with players and viewers
+- `input` – `{frame, input}` controller data
+
+After joining, the server emits `joined` with your player number and `user-joined`/
+`user-left` whenever participants change.
+
+#### HTTP API
+
+All HTTP endpoints require the admin key via the `x-admin-key` header (or `?adminKey=` query parameter).
+
+- `GET /rooms` – list rooms
+- `GET /rooms/{id}` – room details including player names, GUIDs, `privacy`, and `passwordProtected`
+- `POST /rooms` – create a room
+- `POST /rooms/{id}/join` – validate joining a room
+- `DELETE /rooms/{id}` – remove a room
+
+Example:
+
+```sh
+curl -H "x-admin-key: admin123" http://localhost:9000/rooms
+```
+
+Point `EJS_netplayUrl` in your EmulatorJS configuration to use the server.
+Supply `EJS_netplayToken` with a JWT from `/token` and optionally set
+`EJS_netplayName` and `EJS_netplayGuid` to identify the client when joining
+rooms. Set `EJS_netplaySpectator=true` to join a room as a viewer instead of a
+player.
+
+<br>
+
 #### Localization
 
 If you want to help with localization, please check out the [localization](data/localization/README.md) documentation.
