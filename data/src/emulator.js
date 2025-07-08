@@ -5278,12 +5278,18 @@ class EmulatorJS {
         while (this.netplay.url.endsWith("/")) {
             this.netplay.url = this.netplay.url.substring(0, this.netplay.url.length - 1);
         }
+        this.netplay.name = this.config.netplayName || this.netplay.name || "";
+        this.netplay.playerID = this.config.netplayGuid || guidGenerator();
+        this.netplay.token = this.config.netplayToken;
+        this.netplay.spectator = !!this.config.netplaySpectator;
         this.netplay.current_frame = 0;
         this.netplay.getOpenRooms = async () => {
-            return JSON.parse(await (await fetch(this.netplay.url + "/list?domain=" + window.location.host + "&game_id=" + this.config.gameId)).text());
+            return JSON.parse(await (await fetch(this.netplay.url + "/rooms", { headers: { 'Authorization': this.netplay.token ? `Bearer ${this.netplay.token}` : undefined } })).text());
         }
         this.netplay.updateTableList = async () => {
-            const addToTable = (id, name, current, max) => {
+            const addToTable = (info) => {
+                const { roomId, roomName, players, maxPlayers } = info;
+                const current = players.length;
                 const row = this.createElement("tr");
                 row.classList.add("ejs_netplay_table_row");
                 const addToHeader = (text) => {
@@ -5294,13 +5300,14 @@ class EmulatorJS {
                     row.appendChild(item);
                     return item;
                 }
-                addToHeader(name).style["text-align"] = "left";
-                addToHeader(current + "/" + max).style.width = "80px";
+                addToHeader(roomName || roomId).style["text-align"] = "left";
+                addToHeader(current + "/" + maxPlayers).style.width = "80px";
 
                 const parent = addToHeader("");
                 parent.style.width = "80px";
                 this.netplay.table.appendChild(row);
-                if (current < max) {
+                const joinAvailable = current < maxPlayers;
+                if (joinAvailable) {
                     const join = this.createElement("button");
                     join.classList.add("ejs_netplay_join_button");
                     join.classList.add("ejs_button_button");
@@ -5308,16 +5315,27 @@ class EmulatorJS {
                     join.innerText = this.localization("Join");
                     parent.appendChild(join);
                     this.addEventListener(join, "click", (e) => {
-                        this.netplay.joinRoom(id, name);
+                        this.netplay.spectator = false;
+                        this.netplay.joinRoom(roomId, roomName);
                     })
                     return join;
                 }
+                const watch = this.createElement("button");
+                watch.classList.add("ejs_netplay_join_button");
+                watch.classList.add("ejs_button_button");
+                watch.style["background-color"] = "rgba(var(--ejs-primary-color),0.6)";
+                watch.innerText = this.localization("Watch");
+                parent.appendChild(watch);
+                this.addEventListener(watch, "click", () => {
+                    this.netplay.spectator = true;
+                    this.netplay.joinRoom(roomId, roomName);
+                });
             }
             const open = await this.netplay.getOpenRooms();
             //console.log(open);
             this.netplay.table.innerHTML = "";
-            for (const k in open) {
-                addToTable(k, open[k].room_name, open[k].current, open[k].max);//todo: password
+            for (const info of open) {
+                addToTable(info);
             }
         }
         this.netplay.showOpenRoomDialog = () => {
@@ -5403,19 +5421,23 @@ class EmulatorJS {
             })
         }
         this.netplay.startSocketIO = (callback) => {
-            this.netplay.socket = io(this.netplay.url);
+            const opts = {};
+            if (this.netplay.token) opts.auth = { token: this.netplay.token };
+            this.netplay.socket = io(this.netplay.url, opts);
             this.netplay.socket.on("connect", () => callback());
-            this.netplay.socket.on("users-updated", (users) => {
-                this.netplay.reset();
-                if (this.debug) console.log(users);
-                this.netplay.players = users;
+            this.netplay.socket.on("joined", (info) => {
+                this.netplay.players[info.guid] = info;
                 this.netplay.updatePlayersTable();
-                if (this.netplay.owner) this.netplay.sync();
-            })
+            });
+            this.netplay.socket.on("user-joined", (info) => {
+                this.netplay.players[info.guid] = info;
+                this.netplay.updatePlayersTable();
+            });
+            this.netplay.socket.on("user-left", (info) => {
+                delete this.netplay.players[info.guid];
+                this.netplay.updatePlayersTable();
+            });
             this.netplay.socket.on("disconnect", () => this.netplay.roomLeft());
-            this.netplay.socket.on("data-message", (data) => {
-                this.netplay.dataMessage(data);
-            })
         }
         this.netplay.openRoom = (roomName, maxPlayers, password) => {
             const sessionid = guidGenerator();
@@ -5429,14 +5451,17 @@ class EmulatorJS {
                 userid: this.netplay.playerID,
                 sessionid: sessionid
             }
-            this.netplay.players[this.netplay.playerID] = this.netplay.extra;
             this.netplay.users = {};
 
             this.netplay.startSocketIO((error) => {
-                this.netplay.socket.emit("open-room", {
-                    extra: this.netplay.extra,
+                this.netplay.socket.emit("create-room", {
+                    roomId: sessionid,
+                    roomName: roomName,
                     maxPlayers: maxPlayers,
-                    password: password
+                    maxViewers: 10,
+                    password: password,
+                    name: this.netplay.name,
+                    guid: this.netplay.playerID
                 }, (error) => {
                     if (error) {
                         if (this.debug) console.log("error: ", error);
@@ -5460,20 +5485,19 @@ class EmulatorJS {
                 player_name: this.netplay.name,
                 userid: this.netplay.playerID,
                 sessionid: sessionid
-            }
-            this.netplay.players[this.netplay.playerID] = this.netplay.extra;
+            };
 
             this.netplay.startSocketIO((error) => {
                 this.netplay.socket.emit("join-room", {
-                    extra: this.netplay.extra//,
-                    //password: password
-                }, (error, users) => {
+                    roomId: sessionid,
+                    name: this.netplay.name,
+                    guid: this.netplay.playerID,
+                    spectator: this.netplay.spectator
+                }, (error) => {
                     if (error) {
                         if (this.debug) console.log("error: ", error);
                         return;
                     }
-                    this.netplay.players = users;
-                    //this.netplay.roomJoined(false, roomName, password, sessionid);
                     this.netplay.roomJoined(false, roomName, "", sessionid);
                 })
             });
@@ -5529,23 +5553,27 @@ class EmulatorJS {
         this.netplay.updatePlayersTable = () => {
             const table = this.netplay.playerTable;
             table.innerHTML = "";
-            const addToTable = (num, playerName) => {
+            const addRow = (num, playerName) => {
                 const row = this.createElement("tr");
-                const addToHeader = (text) => {
+                const addCell = (text) => {
                     const item = this.createElement("td");
                     item.innerText = text;
                     row.appendChild(item);
                     return item;
-                }
-                addToHeader(num).style.width = "80px";
-                addToHeader(playerName);
-                addToHeader("").style.width = "80px"; //"join" button
+                };
+                addCell(num).style.width = "80px";
+                addCell(playerName);
+                addCell("").style.width = "80px";
                 table.appendChild(row);
-            }
-            let i = 1;
-            for (const k in this.netplay.players) {
-                addToTable(i, this.netplay.players[k].player_name);
-                i++;
+            };
+            for (const id in this.netplay.players) {
+                const info = this.netplay.players[id];
+                const name = info.name || info.player_name || id;
+                if (info.spectator || info.player == null) {
+                    addRow(this.localization("Viewer"), name);
+                } else {
+                    addRow(this.localization("Player") + " " + info.player, name);
+                }
             }
         }
         this.netplay.roomLeft = () => {
@@ -5554,6 +5582,7 @@ class EmulatorJS {
             this.netplay.tabs[1].style.display = "none";
             this.netplay.extra = null;
             this.netplay.playerID = null;
+            this.netplay.spectator = !!this.config.netplaySpectator;
             this.netplay.createButton.innerText = this.localization("Create a Room");
             this.netplay.socket.disconnect();
             this.elements.bottomBar.cheat[0].style.display = this.netplay.oldStyles[0];
