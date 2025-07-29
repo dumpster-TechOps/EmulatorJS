@@ -1,4 +1,4 @@
-import { createRoom, joinRoom, rooms } from '../server/netplay-server.js';
+import { createRoom, joinRoom, updateState, rooms } from '../server/netplay-server.js';
 
 describe('netplay-server room lifecycle', () => {
   afterEach(() => {
@@ -37,15 +37,14 @@ describe('netplay-server room lifecycle', () => {
     expect(rooms.has('room3')).toBe(false);
   });
 
-  test('reconnection reuses same player number', () => {
+  test('updateState increments version', () => {
     createRoom('room4');
-    const s1 = { id: 'x1' };
-    const res1 = joinRoom('room4', s1, { name: 'A', guid: 'g1' });
+    const r1 = updateState('room4', 's1');
+    expect(r1).toEqual({ state: 's1', version: 1 });
+    const r2 = updateState('room4', 's2');
+    expect(r2).toEqual({ state: 's2', version: 2 });
     const room = rooms.get('room4');
-    room.players.delete(s1.id);
-    room.guidMap.get('g1').disconnectedAt = Date.now();
-    const s2 = { id: 'x2' };
-    const res2 = joinRoom('room4', s2, { name: 'A', guid: 'g1' });
-    expect(res2.player).toBe(res1.player);
+    expect(room.state).toBe('s2');
+    expect(room.stateVersion).toBe(2);
   });
 });

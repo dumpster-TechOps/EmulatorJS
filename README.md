@@ -175,6 +175,9 @@ io("http://localhost:9000", { auth: { token: "<JWT>" } })
 - Query room and player info via HTTP API
 - One-day JWT tokens so the API key itself never reaches the client
 - Join rooms as a viewer without taking a player slot
+- Deterministic lock-step with state synchronisation
+- Optional run-ahead prediction to mask latency
+- Spectator stream forwarding compressed video/audio
 
 #### WebSocket events
 
@@ -182,9 +185,11 @@ io("http://localhost:9000", { auth: { token: "<JWT>" } })
 - `join-room` – `{roomId, password?, spectator?, name, guid}` (set `spectator` to `true` to join as viewer)
 - `list-rooms` – returns all rooms with players and viewers
 - `input` – `{frame, input}` controller data
+- `predict` – `{frame, input}` predicted future input
+- `sync-state` – `{state}` binary save state
+- `spectate-data` – compressed video/audio for viewers only
 
-After joining, the server emits `joined` with your player number and `user-joined`/
-`user-left` whenever participants change.
+After joining, the server emits `joined` with your player number, current frame and game state. `user-joined`/`user-left` are sent whenever participants change.
 
 #### HTTP API
 
