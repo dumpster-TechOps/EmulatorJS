@@ -1,7 +1,7 @@
 'use strict';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { parse } from 'url';
+import { parse, fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
@@ -294,6 +294,10 @@ io.on('connection', socket => {
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`Netplay server listening on ${PORT}`);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  httpServer.listen(PORT, () => {
+    console.log(`Netplay server listening on ${PORT}`);
+  });
+}
+
+export { createRoom, rooms };
