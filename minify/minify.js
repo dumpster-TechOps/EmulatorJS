@@ -9,28 +9,27 @@ const __dirname = path.dirname(__filename);
 const rootPath = path.resolve(__dirname, "../");
 
 async function doMinify() {
-    await minify({
-        compressor: terser,
-        input: path.join(rootPath, "data/src/*.js"),
-        output: path.join(rootPath, "data/emulator.min.js"),
-    })
-        .catch(function (err) {
-            console.error(err);
-        })
-        .then(function() {
-            console.log("Minified JS");
+    try {
+        await minify({
+            compressor: terser,
+            input: path.join(rootPath, "data/src/*.js"),
+            output: path.join(rootPath, "data/emulator.min.js"),
         });
-    await minify({
-        compressor: cleanCSS,
-        input: path.join(rootPath, "data/emulator.css"),
-        output: path.join(rootPath, "data/emulator.min.css"),
-    })
-        .catch(function (err) {
-            console.error(err);
-        })
-        .then(function() {
-            console.log("Minified CSS");
+    } catch (err) {
+        console.error(err);
+    }
+    console.log("Minified JS");
+
+    try {
+        await minify({
+            compressor: cleanCSS,
+            input: path.join(rootPath, "data/emulator.css"),
+            output: path.join(rootPath, "data/emulator.min.css"),
         });
+    } catch (err) {
+        console.error(err);
+    }
+    console.log("Minified CSS");
 }
 
 console.log("Minifying");

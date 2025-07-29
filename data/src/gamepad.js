@@ -1,6 +1,6 @@
 class GamepadHandler {
     gamepads;
-    timeout;
+    frameId;
     listeners;
     constructor() {
         this.buttonLabels = {
@@ -23,18 +23,19 @@ class GamepadHandler {
         };
         this.gamepads = [];
         this.listeners = {};
-        this.timeout = null;
+        this.frameId = null;
+        this.loop = this.loop.bind(this);
         this.loop();
     }
     terminate() {
-        window.clearTimeout(this.timeout);
+        window.cancelAnimationFrame(this.frameId);
     }
     getGamepads() {
         return navigator.getGamepads ? navigator.getGamepads() : (navigator.webkitGetGamepads ? navigator.webkitGetGamepads() : []);
     }
     loop() {
         this.updateGamepadState();
-        this.timeout = setTimeout(this.loop.bind(this), 10);
+        this.frameId = window.requestAnimationFrame(this.loop);
     }
     updateGamepadState() {
         let gamepads = Array.from(this.getGamepads());
