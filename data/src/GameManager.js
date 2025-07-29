@@ -213,15 +213,16 @@ class EJS_GameManager {
             this.FS.unlink("screenshot.png");
         } catch(e) {}
         this.functions.screenshot();
-        return new Promise(async resolve => {
-            while (1) {
+        return new Promise(resolve => {
+            const check = setInterval(() => {
                 try {
                     this.FS.stat("/screenshot.png");
-                    return resolve(this.FS.readFile("/screenshot.png"));
-                } catch(e) {}
-                await new Promise(res => setTimeout(res, 50));
-            }
-        })
+                    const data = this.FS.readFile("/screenshot.png");
+                    clearInterval(check);
+                    resolve(data);
+                } catch (e) {}
+            }, 50);
+        });
     }
     quickSave(slot) {
         if (!slot) slot = 1;
