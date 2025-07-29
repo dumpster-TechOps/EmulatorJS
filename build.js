@@ -16,6 +16,8 @@ const args = process.argv.slice(2);
 const npmArg = args.find(arg => arg.startsWith('--npm='));
 const build_type = npmArg ? npmArg.split('=')[1] : process.env.npm;
 
+(async function main() {
+
 if (!build_type) {
     const progressData = {
         '7z': 0,
@@ -180,4 +182,4 @@ if (!build_type) {
         console.log("EmulatorJS cores built successfully!");
         console.log("Ready to build EmulatorJS!");
     }
-}
+})();

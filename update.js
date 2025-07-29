@@ -124,12 +124,14 @@ if (!update_version) {
 }
 
 console.log("Updating EmulatorJS dependencies...");
-if (depsArg) {
-    await updateDependencies();
-}
-if (update_version || dev === "false" || dev === "true") {
-    console.log("Updating EmulatorJS version...");
-    await updateVersion(update_version || version);
-}
-await updateContributors();
-console.log("Updating EmulatorJS completed.");
+(async () => {
+    if (depsArg) {
+        await updateDependencies();
+    }
+    if (update_version || dev === "false" || dev === "true") {
+        console.log("Updating EmulatorJS version...");
+        await updateVersion(update_version || version);
+    }
+    await updateContributors();
+    console.log("Updating EmulatorJS completed.");
+})();

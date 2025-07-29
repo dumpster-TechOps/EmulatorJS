@@ -33,5 +33,7 @@ async function doMinify() {
 }
 
 console.log("Minifying");
-await doMinify();
-console.log("Minifying Done!");
+(async () => {
+    await doMinify();
+    console.log("Minifying Done!");
+})();
