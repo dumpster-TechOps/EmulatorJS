@@ -29,7 +29,8 @@
     "node-7z": "^3.0.0",
     "nipplejs": "^0.10.2",
     "socket.io": "^4.8.1",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "simple-peer": "^9.11.1"
   },
   "optionalDependencies": {
     "@emulatorjs/cores": "latest"
