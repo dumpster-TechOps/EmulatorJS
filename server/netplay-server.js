@@ -7,6 +7,8 @@ import jwt from 'jsonwebtoken';
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const API_KEY = process.env.API_KEY || '';
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
+const ALLOW_PLAYER_JOIN = process.env.ALLOW_PLAYER_JOIN !== 'false';
+const ALLOW_VIEWER_JOIN = process.env.ALLOW_VIEWER_JOIN !== 'false';
 
 /**
  * Room structure
@@ -44,10 +46,12 @@ function joinRoom(id, socket, { spectator = false, password = '', name = '', gui
   if (room.password && room.password !== password) return { error: 'bad-password' };
   if (room.allowedUsers && !room.allowedUsers.has(guid)) return { error: 'not-allowed' };
   if (spectator || room.players.size >= room.maxPlayers) {
+    if (!ALLOW_VIEWER_JOIN) return { error: 'viewers-disabled' };
     if (room.viewers.size >= room.maxViewers) return { error: 'room-full' };
     room.viewers.set(socket.id, { name, guid });
     return { player: null, spectator: true, name, guid };
   }
+  if (!ALLOW_PLAYER_JOIN) return { error: 'players-disabled' };
   const playerNum = room.players.size + 1;
   room.players.set(socket.id, { num: playerNum, name, guid });
   return { player: playerNum, spectator: false, name, guid };
@@ -308,4 +312,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   });
 }
 
-export { createRoom, rooms };
+export { createRoom, joinRoom, rooms };
