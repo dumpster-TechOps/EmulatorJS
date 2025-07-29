@@ -1436,15 +1436,15 @@ class EmulatorJS {
         this.addEventListener(this.elements.parent, "contextmenu", (e) => e.preventDefault());
         this.addEventListener(this.game, "mousedown touchend", hideMenu);
         const parent = this.createElement("ul");
-        const addButton = (title, hidden, functi0n) => {
+        const addButton = (title, hidden, callback) => {
             //<li><a href="#" onclick="return false">'+title+'</a></li>
             const li = this.createElement("li");
             if (hidden) li.hidden = true;
             const a = this.createElement("a");
-            if (functi0n instanceof Function) {
+            if (callback instanceof Function) {
                 this.addEventListener(li, "click", (e) => {
                     e.preventDefault();
-                    functi0n();
+                    callback();
                 });
             }
             a.href = "#";
@@ -1526,14 +1526,14 @@ class EmulatorJS {
             body.appendChild(menu);
             menu.classList.add("ejs_list_selector");
             const parent = this.createElement("ul");
-            const addButton = (title, hidden, functi0n) => {
+            const addButton = (title, hidden, callback) => {
                 const li = this.createElement("li");
                 if (hidden) li.hidden = true;
                 const a = this.createElement("a");
-                if (functi0n instanceof Function) {
+                if (callback instanceof Function) {
                     this.addEventListener(li, "click", (e) => {
                         e.preventDefault();
-                        functi0n(li);
+                        callback(li);
                     });
                 }
                 a.href = "#";
