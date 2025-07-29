@@ -89,6 +89,62 @@ class EmulatorJS {
             data[i].elem.removeEventListener(data[i].listener, data[i].cb);
         }
     }
+    populateOptionMenu(id, options, defaultOption, store, changeFn, optionsMenu, current, goToHome, funcs, allOpts) {
+        let buttons = [];
+        let opts = options;
+        if (Array.isArray(options)) {
+            opts = {};
+            for (let i = 0; i < options.length; i++) {
+                opts[options[i]] = options[i];
+            }
+        }
+        allOpts[id] = opts;
+
+        funcs.push((title) => {
+            if (id !== title) return;
+            for (let j = 0; j < buttons.length; j++) {
+                buttons[j].classList.toggle("ejs_option_row_selected", buttons[j].getAttribute("ejs_value") === store[id]);
+            }
+            this.menuOptionChanged(id, store[id]);
+            current.innerText = opts[store[id]];
+        });
+
+        for (const opt in opts) {
+            const optionButton = this.createElement("button");
+            buttons.push(optionButton);
+            optionButton.setAttribute("ejs_value", opt);
+            optionButton.type = "button";
+            optionButton.value = opts[opt];
+            optionButton.classList.add("ejs_option_row");
+            optionButton.classList.add("ejs_button_style");
+
+            this.addEventListener(optionButton, "click", (e) => {
+                if (changeFn) {
+                    changeFn(id, opt);
+                } else {
+                    store[id] = opt;
+                }
+                for (let j = 0; j < buttons.length; j++) {
+                    buttons[j].classList.remove("ejs_option_row_selected");
+                }
+                optionButton.classList.add("ejs_option_row_selected");
+                this.menuOptionChanged(id, opt);
+                current.innerText = opts[opt];
+                if (goToHome) goToHome();
+            })
+            if (defaultOption === opt) {
+                optionButton.classList.add("ejs_option_row_selected");
+                this.menuOptionChanged(id, opt);
+                current.innerText = opts[opt];
+            }
+
+            const msg = this.createElement("span");
+            msg.innerText = opts[opt];
+            optionButton.appendChild(msg);
+
+            optionsMenu.appendChild(optionButton);
+        }
+    }
     downloadFile(path, progressCB, notWithPath, opts) {
         return new Promise(async cb => {
             const data = this.toData(path); //check other data types
@@ -4397,7 +4453,6 @@ class EmulatorJS {
         }
         let allOpts = {};
 
-        // TODO - Why is this duplicated?
         const addToMenu = (title, id, options, defaultOption) => {
             const span = this.createElement("span");
             span.innerText = title;
@@ -4432,56 +4487,7 @@ class EmulatorJS {
             const optionsMenu = this.createElement("div");
             optionsMenu.classList.add("ejs_setting_menu");
 
-            let buttons = [];
-            let opts = options;
-            if (Array.isArray(options)) {
-                opts = {};
-                for (let i = 0; i < options.length; i++) {
-                    opts[options[i]] = options[i];
-                }
-            }
-            allOpts[id] = opts;
-
-            funcs.push((title) => {
-                if (id !== title) return;
-                for (let j = 0; j < buttons.length; j++) {
-                    buttons[j].classList.toggle("ejs_option_row_selected", buttons[j].getAttribute("ejs_value") === this.disks[id]);
-                }
-                this.menuOptionChanged(id, this.disks[id]);
-                current.innerText = opts[this.disks[id]];
-            });
-
-            for (const opt in opts) {
-                const optionButton = this.createElement("button");
-                buttons.push(optionButton);
-                optionButton.setAttribute("ejs_value", opt);
-                optionButton.type = "button";
-                optionButton.value = opts[opt];
-                optionButton.classList.add("ejs_option_row");
-                optionButton.classList.add("ejs_button_style");
-
-                this.addEventListener(optionButton, "click", (e) => {
-                    this.disks[id] = opt;
-                    for (let j = 0; j < buttons.length; j++) {
-                        buttons[j].classList.remove("ejs_option_row_selected");
-                    }
-                    optionButton.classList.add("ejs_option_row_selected");
-                    this.menuOptionChanged(id, opt);
-                    current.innerText = opts[opt];
-                    goToHome();
-                })
-                if (defaultOption === opt) {
-                    optionButton.classList.add("ejs_option_row_selected");
-                    this.menuOptionChanged(id, opt);
-                    current.innerText = opts[opt];
-                }
-
-                const msg = this.createElement("span");
-                msg.innerText = opts[opt];
-                optionButton.appendChild(msg);
-
-                optionsMenu.appendChild(optionButton);
-            }
+            this.populateOptionMenu(id, options, defaultOption, this.disks, this.changeDiskOption, optionsMenu, current, goToHome, funcs, allOpts);
 
             home.appendChild(optionsMenu);
 
@@ -4734,56 +4740,7 @@ class EmulatorJS {
             pageTitle.classList.add("ejs_menu_text_a");
             button.appendChild(pageTitle);
 
-            let buttons = [];
-            let opts = options;
-            if (Array.isArray(options)) {
-                opts = {};
-                for (let i = 0; i < options.length; i++) {
-                    opts[options[i]] = options[i];
-                }
-            }
-            allOpts[id] = opts;
-
-            funcs.push((title) => {
-                if (id !== title) return;
-                for (let j = 0; j < buttons.length; j++) {
-                    buttons[j].classList.toggle("ejs_option_row_selected", buttons[j].getAttribute("ejs_value") === settings[id]);
-                }
-                this.menuOptionChanged(id, settings[id]);
-                current.innerText = opts[settings[id]];
-            });
-
-            for (const opt in opts) {
-                const optionButton = this.createElement("button");
-                buttons.push(optionButton);
-                optionButton.setAttribute("ejs_value", opt);
-                optionButton.type = "button";
-                optionButton.value = opts[opt];
-                optionButton.classList.add("ejs_option_row");
-                optionButton.classList.add("ejs_button_style");
-
-                this.addEventListener(optionButton, "click", (e) => {
-                    this.changeSettingOption(id, opt);
-                    for (let j = 0; j < buttons.length; j++) {
-                        buttons[j].classList.remove("ejs_option_row_selected");
-                    }
-                    optionButton.classList.add("ejs_option_row_selected");
-                    this.menuOptionChanged(id, opt);
-                    current.innerText = opts[opt];
-                    goToHome();
-                })
-                if (defaultOption === opt) {
-                    optionButton.classList.add("ejs_option_row_selected");
-                    this.menuOptionChanged(id, opt);
-                    current.innerText = opts[opt];
-                }
-
-                const msg = this.createElement("span");
-                msg.innerText = opts[opt];
-                optionButton.appendChild(msg);
-
-                optionsMenu.appendChild(optionButton);
-            }
+            this.populateOptionMenu(id, options, defaultOption, settings, this.changeSettingOption, optionsMenu, current, goToHome, funcs, allOpts);
 
             menuChild.appendChild(optionsMenu);
 
