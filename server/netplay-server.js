@@ -5,10 +5,12 @@ import { parse, fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
-const API_KEY = process.env.API_KEY || '';
+const JWT_SECRET = process.env.JWT_SECRET || process.env.API_KEY || '';
 const ADMIN_KEY = process.env.ADMIN_KEY || '';
 const ALLOW_PLAYER_JOIN = process.env.ALLOW_PLAYER_JOIN !== 'false';
 const ALLOW_VIEWER_JOIN = process.env.ALLOW_VIEWER_JOIN !== 'false';
+const ICE_SERVERS = process.env.ICE_SERVERS ? JSON.parse(process.env.ICE_SERVERS) : [];
+const ALLOWED_DOMAINS = process.env.ALLOWED_DOMAINS ? process.env.ALLOWED_DOMAINS.split(',') : ['*'];
 
 /**
  * Room structure
@@ -24,17 +26,28 @@ const ALLOW_VIEWER_JOIN = process.env.ALLOW_VIEWER_JOIN !== 'false';
  */
 const rooms = new Map();
 
+function roomState(room) {
+  return {
+    frame: room.frame,
+    players: Array.from(room.guidMap.entries()).map(([guid, info]) => ({ num: info.num, name: info.name, guid })),
+    viewers: Array.from(room.viewers.values()).map(v => ({ name: v.name, guid: v.guid }))
+  };
+}
+
 function createRoom(id, opts = {}) {
   if (rooms.has(id)) throw new Error('Room already exists');
   rooms.set(id, {
     password: opts.password || '',
     privacy: opts.privacy || 'public',
     roomName: opts.roomName || id,
+    game: opts.game || '',
     maxPlayers: opts.maxPlayers || 2,
     maxViewers: typeof opts.maxViewers === 'number' ? opts.maxViewers : 0,
     allowedUsers: Array.isArray(opts.allowedUsers) ? new Set(opts.allowedUsers) : null,
     players: new Map(),
     viewers: new Map(),
+    guidMap: new Map(),
+    stats: new Map(),
     frame: 0,
     inputs: {}
   });
@@ -52,15 +65,26 @@ function joinRoom(id, socket, { spectator = false, password = '', name = '', gui
     return { player: null, spectator: true, name, guid };
   }
   if (!ALLOW_PLAYER_JOIN) return { error: 'players-disabled' };
-  const playerNum = room.players.size + 1;
-  room.players.set(socket.id, { num: playerNum, name, guid });
+  let playerNum;
+  if (room.guidMap.has(guid)) {
+    const info = room.guidMap.get(guid);
+    playerNum = info.num;
+    room.players.set(socket.id, { num: playerNum, name: info.name, guid });
+    info.socketId = socket.id;
+    info.disconnectedAt = null;
+  } else {
+    playerNum = room.players.size + 1;
+    room.players.set(socket.id, { num: playerNum, name, guid });
+    room.guidMap.set(guid, { num: playerNum, name, socketId: socket.id, disconnectedAt: null });
+  }
+  if (!room.stats.has(guid)) room.stats.set(guid, { latencies: [], lastSeq: 0, lost: 0 });
   return { player: playerNum, spectator: false, name, guid };
 }
 
 function verifyToken(token) {
-  if (!API_KEY) return false;
+  if (!JWT_SECRET) return false;
   try {
-    jwt.verify(token, API_KEY);
+    jwt.verify(token, JWT_SECRET);
     return true;
   } catch {
     return false;
@@ -101,12 +125,12 @@ const httpServer = createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'POST' && pathname === '/token') {
-    if ((req.headers['x-api-key'] || query.key) !== API_KEY) {
+    if ((req.headers['x-api-key'] || query.key) !== JWT_SECRET) {
       res.statusCode = 401;
       res.end(JSON.stringify({ error: 'unauthorized' }));
       return;
     }
-    const token = jwt.sign({}, API_KEY, { expiresIn: '1d' });
+    const token = jwt.sign({}, JWT_SECRET, { expiresIn: '1d' });
     res.end(JSON.stringify({ token }));
     return;
   }
@@ -132,6 +156,23 @@ const httpServer = createServer(async (req, res) => {
         passwordProtected: !!room.password,
         privacy: room.privacy || 'public'
       });
+    }
+    res.end(JSON.stringify(list));
+  } else if (req.method === 'GET' && pathname === '/public-rooms') {
+    const list = [];
+    for (const [roomId, room] of rooms.entries()) {
+      if (room.privacy === 'public') {
+        list.push({ roomId, roomName: room.roomName, game: room.game });
+      }
+    }
+    res.end(JSON.stringify(list));
+  } else if (req.method === 'GET' && pathname === '/rooms/search') {
+    const q = (query.game || '').toLowerCase();
+    const list = [];
+    for (const [roomId, room] of rooms.entries()) {
+      if (room.privacy === 'public' && room.game && room.game.toLowerCase().includes(q)) {
+        list.push({ roomId, roomName: room.roomName, game: room.game });
+      }
     }
     res.end(JSON.stringify(list));
   } else if (req.method === 'GET' && pathname.startsWith('/rooms/')) {
@@ -195,7 +236,7 @@ const httpServer = createServer(async (req, res) => {
   }
 });
 const io = new Server(httpServer, {
-  cors: { origin: '*', methods: ['GET','POST'] }
+  cors: { origin: ALLOWED_DOMAINS, methods: ['GET','POST'] }
 });
 
 io.use((socket, next) => {
@@ -209,6 +250,12 @@ io.on('connection', socket => {
   let playerNum = null;
   let isSpectator = false;
   let playerGuid = null;
+  let seq = 0;
+  const pingInterval = setInterval(() => {
+    if (currentRoom) {
+      socket.emit('latency-ping', { t: Date.now(), seq: seq++ });
+    }
+  }, 5000);
 
   socket.on('list-rooms', cb => {
     const list = [];
@@ -241,6 +288,7 @@ io.on('connection', socket => {
       isSpectator = false;
       socket.join(currentRoom);
       socket.emit('joined', { player: playerNum, name: joinRes.name, guid: joinRes.guid, frame: 0, roomId: currentRoom });
+      socket.emit('state', roomState(rooms.get(currentRoom)));
       io.to(currentRoom).emit('user-joined', { player: playerNum, spectator: false, name: joinRes.name, guid: joinRes.guid });
       cb && cb(null);
     } catch (err) {
@@ -262,7 +310,14 @@ io.on('connection', socket => {
     isSpectator = !!res.spectator;
     socket.join(currentRoom);
     socket.emit('joined', { player: playerNum, spectator: isSpectator, name: res.name, guid: res.guid, frame: rooms.get(currentRoom).frame, roomId: currentRoom });
-    io.to(currentRoom).emit('user-joined', { player: playerNum, spectator: isSpectator, name: res.name, guid: res.guid });
+    socket.emit('state', roomState(rooms.get(currentRoom)));
+    const entry = rooms.get(currentRoom).guidMap.get(res.guid);
+    if (entry && entry.disconnectedAt) {
+      entry.disconnectedAt = null;
+      io.to(currentRoom).emit('user-rejoined', { player: playerNum, name: res.name, guid: res.guid });
+    } else {
+      io.to(currentRoom).emit('user-joined', { player: playerNum, spectator: isSpectator, name: res.name, guid: res.guid });
+    }
     cb && cb(null);
   });
 
@@ -287,6 +342,21 @@ io.on('connection', socket => {
     socket.to(currentRoom).emit('signal', { guid: playerGuid, data });
   });
 
+  socket.on('latency-pong', data => {
+    if (!currentRoom) return;
+    const room = rooms.get(currentRoom);
+    if (!room) return;
+    const stat = room.stats.get(playerGuid);
+    if (!stat) return;
+    const latency = Date.now() - data.t;
+    stat.latencies.push(latency);
+    if (stat.latencies.length > 10) stat.latencies.shift();
+    if (typeof data.seq === 'number') {
+      if (data.seq > stat.lastSeq + 1) stat.lost += data.seq - stat.lastSeq - 1;
+      stat.lastSeq = data.seq;
+    }
+  });
+
   socket.on('disconnect', () => {
     if (!currentRoom) return;
     const room = rooms.get(currentRoom);
@@ -294,22 +364,37 @@ io.on('connection', socket => {
     if (room.players.has(socket.id)) {
       const info = room.players.get(socket.id);
       room.players.delete(socket.id);
-      io.to(currentRoom).emit('user-left', { player: info.num, name: info.name, guid: info.guid });
+      const entry = room.guidMap.get(info.guid);
+      if (entry) entry.disconnectedAt = Date.now();
+      setTimeout(() => {
+        const e = room.guidMap.get(info.guid);
+        if (e && e.disconnectedAt && Date.now() - e.disconnectedAt >= 30000) {
+          room.guidMap.delete(info.guid);
+          room.stats.delete(info.guid);
+          io.to(currentRoom).emit('user-left', { player: info.num, name: info.name, guid: info.guid });
+          if (room.players.size === 0 && room.viewers.size === 0 && room.guidMap.size === 0) rooms.delete(currentRoom);
+        }
+      }, 30000);
     } else if (room.viewers.has(socket.id)) {
       const info = room.viewers.get(socket.id);
       room.viewers.delete(socket.id);
       io.to(currentRoom).emit('user-left', { spectator: true, name: info.name, guid: info.guid });
     }
-    if (room.players.size === 0 && room.viewers.size === 0) {
+    if (room.players.size === 0 && room.viewers.size === 0 && room.guidMap.size === 0) {
       rooms.delete(currentRoom);
     }
+    clearInterval(pingInterval);
   });
 });
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+function startServer() {
   httpServer.listen(PORT, () => {
     console.log(`Netplay server listening on ${PORT}`);
   });
 }
 
-export { createRoom, joinRoom, rooms };
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  startServer();
+}
+
+export { createRoom, joinRoom, rooms, startServer };

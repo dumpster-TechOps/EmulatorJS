@@ -36,4 +36,16 @@ describe('netplay-server room lifecycle', () => {
     if (room.players.size === 0 && room.viewers.size === 0) rooms.delete('room3');
     expect(rooms.has('room3')).toBe(false);
   });
+
+  test('reconnection reuses same player number', () => {
+    createRoom('room4');
+    const s1 = { id: 'x1' };
+    const res1 = joinRoom('room4', s1, { name: 'A', guid: 'g1' });
+    const room = rooms.get('room4');
+    room.players.delete(s1.id);
+    room.guidMap.get('g1').disconnectedAt = Date.now();
+    const s2 = { id: 'x2' };
+    const res2 = joinRoom('room4', s2, { name: 'A', guid: 'g1' });
+    expect(res2.player).toBe(res1.player);
+  });
 });
