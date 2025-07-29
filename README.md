@@ -206,6 +206,18 @@ Supply `EJS_netplayToken` with a JWT from `/token` and optionally set
 rooms. Set `EJS_netplaySpectator=true` to join a room as a viewer instead of a
 player.
 
+WebRTC requires STUN/TURN servers for peer discovery. Configure them with
+`EJS_netplayIceServers` as an array of ICE server objects:
+
+```js
+EJS_netplayIceServers = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'turn:turn.example.com', username: 'user', credential: 'pass' }
+];
+```
+
+TURN credentials are mandatory when using authenticated relays.
+
 <br>
 
 #### Localization

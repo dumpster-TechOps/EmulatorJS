@@ -204,6 +204,7 @@ io.on('connection', socket => {
   let currentRoom = null;
   let playerNum = null;
   let isSpectator = false;
+  let playerGuid = null;
 
   socket.on('list-rooms', cb => {
     const list = [];
@@ -232,6 +233,7 @@ io.on('connection', socket => {
       });
       currentRoom = opts.roomId;
       playerNum = joinRes.player;
+      playerGuid = joinRes.guid;
       isSpectator = false;
       socket.join(currentRoom);
       socket.emit('joined', { player: playerNum, name: joinRes.name, guid: joinRes.guid, frame: 0, roomId: currentRoom });
@@ -252,6 +254,7 @@ io.on('connection', socket => {
     if (res.error) return cb && cb(res.error);
     currentRoom = opts.roomId;
     playerNum = res.player;
+    playerGuid = res.guid;
     isSpectator = !!res.spectator;
     socket.join(currentRoom);
     socket.emit('joined', { player: playerNum, spectator: isSpectator, name: res.name, guid: res.guid, frame: rooms.get(currentRoom).frame, roomId: currentRoom });
@@ -273,6 +276,11 @@ io.on('connection', socket => {
       room.frame = frame;
       delete room.inputs[frame];
     }
+  });
+
+  socket.on('signal', data => {
+    if (!currentRoom) return;
+    socket.to(currentRoom).emit('signal', { guid: playerGuid, data });
   });
 
   socket.on('disconnect', () => {
