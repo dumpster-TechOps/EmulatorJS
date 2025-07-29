@@ -1573,15 +1573,14 @@ class EmulatorJS {
             const info = this.createElement("div");
 
             this.createLink(info, "https://emulatorjs.org", "EmulatorJS");
-            // I do not like using innerHTML, though this should be "safe"
-            info.innerHTML += " is powered by ";
+            info.appendChild(document.createTextNode(" is powered by "));
             this.createLink(info, "https://github.com/libretro/RetroArch/", "RetroArch");
             if (this.repository && this.coreName) {
-                info.innerHTML += ". This core is powered by ";
+                info.appendChild(document.createTextNode(". This core is powered by "));
                 this.createLink(info, this.repository, this.coreName);
-                info.innerHTML += ".";
+                info.appendChild(document.createTextNode("."));
             } else {
-                info.innerHTML += ".";
+                info.appendChild(document.createTextNode("."));
             }
             home.appendChild(info);
 
