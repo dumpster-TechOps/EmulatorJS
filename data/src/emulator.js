@@ -261,7 +261,7 @@ class EmulatorJS {
                 response.text().then(body => {
                     let version = JSON.parse(body);
                     if (this.versionAsInt(this.ejs_version) < this.versionAsInt(version.version)) {
-                        console.log(`Using EmulatorJS version ${this.ejs_version} but the newest version is ${version.current_version}\nopen https://github.com/EmulatorJS/EmulatorJS to update`);
+                        if (this.debug) console.log(`Using EmulatorJS version ${this.ejs_version} but the newest version is ${version.current_version}\nopen https://github.com/EmulatorJS/EmulatorJS to update`);
                     }
                 })
             }
@@ -564,7 +564,7 @@ class EmulatorJS {
             if (typeof log === "undefined") log = true;
             if (!this.config.langJson[text] && log) {
                 if (!this.missingLang.includes(text)) this.missingLang.push(text);
-                console.log(`Translation not found for '${text}'. Language set to '${this.config.language}'`);
+                if (this.debug) console.log(`Translation not found for '${text}'. Language set to '${this.config.language}'`);
             }
             return this.config.langJson[text] || text;
         }
@@ -588,7 +588,7 @@ class EmulatorJS {
         }
     }
     startGameError(message) {
-        console.log(message);
+        if (this.debug) console.log(message);
         this.textElem.innerText = message;
         this.textElem.classList.add("ejs_error_text");
 
@@ -691,7 +691,7 @@ class EmulatorJS {
                 this.textElem.innerText = this.localization("Download Game Core") + progress;
             }, false, { responseType: "arraybuffer", method: "GET" });
             if (res === -1) {
-                console.log("File not found, attemping to fetch from emulatorjs cdn.");
+                if (this.debug) console.log("File not found, attemping to fetch from emulatorjs cdn.");
                 console.error("**THIS METHOD IS A FAILSAFE, AND NOT OFFICIALLY SUPPORTED. USE AT YOUR OWN RISK**");
                 let version = this.ejs_version.endsWith("-beta") ? "nightly" : this.ejs_version;
                 res = await this.downloadFile(`https://cdn.emulatorjs.org/${version}/data/${corePath}`, (progress) => {
@@ -1024,14 +1024,10 @@ class EmulatorJS {
             callbacks: {},
             parent: this.elements.parent,
             print: (msg) => {
-                if (this.debug) {
-                    console.log(msg);
-                }
+                if (this.debug) console.log(msg);
             },
             printErr: (msg) => {
-                if (this.debug) {
-                    console.log(msg);
-                }
+                if (this.debug) console.log(msg);
             },
             totalDependencies: 0,
             locateFile: function (fileName) {
@@ -4556,9 +4552,7 @@ class EmulatorJS {
 
         this.disksMenu.style.display = "none";
 
-        if (this.debug) {
-            console.log("Available core options", allOpts);
-        }
+        if (this.debug) console.log("Available core options", allOpts);
 
         if (this.config.defaultOptions) {
             for (const k in this.config.defaultOptions) {
@@ -5091,9 +5085,7 @@ class EmulatorJS {
 
         this.settingsMenu.style.display = "none";
 
-        if (this.debug) {
-            console.log("Available core options", allOpts);
-        }
+        if (this.debug) console.log("Available core options", allOpts);
 
         if (this.config.defaultOptions) {
             for (const k in this.config.defaultOptions) {
@@ -5656,7 +5648,7 @@ class EmulatorJS {
                 this.netplay.reset();
                 this.play(true);
             }
-            if (data.shortPause) console.log(data.shortPause);
+            if (data.shortPause && this.debug) console.log(data.shortPause);
             if (data.shortPause && data.shortPause !== this.netplay.playerID) {
                 this.pause(true);
                 this.netplay.wait = true;
@@ -5668,7 +5660,7 @@ class EmulatorJS {
                     let frame = this.netplay.currentFrame;
                     if (!value.connected_input || value.connected_input[0] < 0) return;
                     //if (value.connected_input[0] === this.netplay.getUserIndex(this.netplay.playerID)) return;
-                    console.log(value, inFrame, frame);
+                    if (this.debug) console.log(value, inFrame, frame);
                     if (inFrame === frame) {
                         inFrame++;
                         this.gameManager.functions.simulateInput(value.connected_input[0], value.connected_input[1], value.connected_input[2]);
@@ -5763,11 +5755,11 @@ class EmulatorJS {
                     this.play();
                     this.netplay.inputsData[this.netplay.currentFrame].forEach((value) => {
                         if (!value.connected_input) return;
-                        console.log(value.connected_input);
+                        if (this.debug) console.log(value.connected_input);
                         this.gameManager.functions.simulateInput(value.connected_input[0], value.connected_input[1], value.connected_input[2]);
                     })
                 } else if (!this.netplay.syncing) {
-                    console.log("sync");
+                    if (this.debug) console.log("sync");
                     this.pause(true);
                     this.netplay.sendMessage({ sync: true });
                     this.netplay.syncing = true;
