@@ -30,7 +30,11 @@
     "nipplejs": "^0.10.2",
     "socket.io": "^4.8.1",
     "jsonwebtoken": "^9.0.2",
-    "simple-peer": "^9.11.1"
+    "simple-peer": "^9.11.1",
+    "commander": "^11.0.0"
+  },
+  "bin": {
+    "ejs-netplay-server": "server/cli.js"
   },
   "optionalDependencies": {
     "@emulatorjs/cores": "latest"
