@@ -14,7 +14,7 @@
     "url": "https://github.com/EmulatorJS/EmulatorJS/issues"
   },
   "scripts": {
-    "start": "http-server",
+    "start": "node start.js",
     "minify": "node minify/minify.js",
     "build": "node build.js",
     "update": "node update.js",
