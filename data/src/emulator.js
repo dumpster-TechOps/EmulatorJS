@@ -5380,6 +5380,8 @@ class EmulatorJS {
             const opts = {};
             if (this.netplay.token) opts.auth = { token: this.netplay.token };
             this.netplay.socket = io(this.netplay.url, opts);
+            this.netplay.webrtc = new window.EJS_Netplay(this.netplay.socket, this.netplay.playerID, this.config.netplayIceServers || []);
+            this.netplay.webrtc.onData = this.netplay.dataMessage;
             this.netplay.socket.on("connect", () => callback());
             this.netplay.socket.on("joined", (info) => {
                 this.netplay.players[info.guid] = info;
@@ -5388,9 +5390,18 @@ class EmulatorJS {
             this.netplay.socket.on("user-joined", (info) => {
                 this.netplay.players[info.guid] = info;
                 this.netplay.updatePlayersTable();
+                if (this.netplay.webrtc && info.guid !== this.netplay.playerID) {
+                    const initiator = this.netplay.playerID < info.guid;
+                    this.netplay.webrtc.createPeer(info.guid, initiator);
+                }
             });
             this.netplay.socket.on("user-left", (info) => {
                 delete this.netplay.players[info.guid];
+                if (this.netplay.webrtc && this.netplay.webrtc.peers.has(info.guid)) {
+                    const p = this.netplay.webrtc.peers.get(info.guid);
+                    if (p.destroy) p.destroy();
+                    this.netplay.webrtc.peers.delete(info.guid);
+                }
                 this.netplay.updatePlayersTable();
             });
             this.netplay.socket.on("disconnect", () => this.netplay.roomLeft());
@@ -5694,7 +5705,9 @@ class EmulatorJS {
             }
         }
         this.netplay.sendMessage = (data) => {
-            this.netplay.socket.emit("data-message", data);
+            if (this.netplay.webrtc) {
+                this.netplay.webrtc.broadcast(data);
+            }
         }
         this.netplay.reset = () => {
             this.netplay.init_frame = this.netplay.currentFrame;
