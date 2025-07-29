@@ -1,4 +1,4 @@
-import { createRoom, joinRoom, rooms } from '../server/netplay-server.js';
+import { createRoom, joinRoom, updateState, rooms } from '../server/netplay-server.js';
 
 describe('netplay-server room lifecycle', () => {
   afterEach(() => {
@@ -35,5 +35,16 @@ describe('netplay-server room lifecycle', () => {
     room.players.delete(s2.id);
     if (room.players.size === 0 && room.viewers.size === 0) rooms.delete('room3');
     expect(rooms.has('room3')).toBe(false);
+  });
+
+  test('updateState increments version', () => {
+    createRoom('room4');
+    const r1 = updateState('room4', 's1');
+    expect(r1).toEqual({ state: 's1', version: 1 });
+    const r2 = updateState('room4', 's2');
+    expect(r2).toEqual({ state: 's2', version: 2 });
+    const room = rooms.get('room4');
+    expect(room.state).toBe('s2');
+    expect(room.stateVersion).toBe(2);
   });
 });

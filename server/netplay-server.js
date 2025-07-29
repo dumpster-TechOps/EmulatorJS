@@ -36,7 +36,9 @@ function createRoom(id, opts = {}) {
     players: new Map(),
     viewers: new Map(),
     frame: 0,
-    inputs: {}
+    inputs: {},
+    state: null,
+    stateVersion: 0
   });
 }
 
@@ -55,6 +57,14 @@ function joinRoom(id, socket, { spectator = false, password = '', name = '', gui
   const playerNum = room.players.size + 1;
   room.players.set(socket.id, { num: playerNum, name, guid });
   return { player: playerNum, spectator: false, name, guid };
+}
+
+function updateState(id, state) {
+  const room = rooms.get(id);
+  if (!room) throw new Error('Room not found');
+  room.state = state;
+  room.stateVersion = (room.stateVersion || 0) + 1;
+  return { state: room.state, version: room.stateVersion };
 }
 
 function verifyToken(token) {
@@ -240,7 +250,7 @@ io.on('connection', socket => {
       playerGuid = joinRes.guid;
       isSpectator = false;
       socket.join(currentRoom);
-      socket.emit('joined', { player: playerNum, name: joinRes.name, guid: joinRes.guid, frame: 0, roomId: currentRoom });
+      socket.emit('joined', { player: playerNum, name: joinRes.name, guid: joinRes.guid, frame: 0, roomId: currentRoom, state: null, stateVersion: 0 });
       io.to(currentRoom).emit('user-joined', { player: playerNum, spectator: false, name: joinRes.name, guid: joinRes.guid });
       cb && cb(null);
     } catch (err) {
@@ -261,7 +271,8 @@ io.on('connection', socket => {
     playerGuid = res.guid;
     isSpectator = !!res.spectator;
     socket.join(currentRoom);
-    socket.emit('joined', { player: playerNum, spectator: isSpectator, name: res.name, guid: res.guid, frame: rooms.get(currentRoom).frame, roomId: currentRoom });
+    const room = rooms.get(currentRoom);
+    socket.emit('joined', { player: playerNum, spectator: isSpectator, name: res.name, guid: res.guid, frame: room.frame, roomId: currentRoom, state: room.state, stateVersion: room.stateVersion });
     io.to(currentRoom).emit('user-joined', { player: playerNum, spectator: isSpectator, name: res.name, guid: res.guid });
     cb && cb(null);
   });
@@ -279,6 +290,25 @@ io.on('connection', socket => {
       });
       room.frame = frame;
       delete room.inputs[frame];
+    }
+  });
+
+  socket.on('predict', data => {
+    if (!currentRoom || isSpectator) return;
+    socket.to(currentRoom).emit('predict', { frame: data.frame, input: data.input, player: playerNum });
+  });
+
+  socket.on('sync-state', data => {
+    if (!currentRoom) return;
+    const result = updateState(currentRoom, data.state);
+    socket.to(currentRoom).emit('sync-state', { state: result.state, version: result.version });
+  });
+
+  socket.on('spectate-data', data => {
+    if (!currentRoom) return;
+    const room = rooms.get(currentRoom);
+    for (const [id] of room.viewers) {
+      if (id !== socket.id) io.to(id).emit('spectate-data', data);
     }
   });
 
@@ -312,4 +342,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   });
 }
 
-export { createRoom, joinRoom, rooms };
+export { createRoom, joinRoom, updateState, rooms };
