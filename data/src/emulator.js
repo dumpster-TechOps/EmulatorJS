@@ -186,33 +186,55 @@ class EmulatorJS {
                 }
                 return;
             }
-            const xhr = new XMLHttpRequest();
-            if (progressCB instanceof Function) {
-                xhr.addEventListener("progress", (e) => {
-                    const progress = e.total ? " " + Math.floor(e.loaded / e.total * 100).toString() + "%" : " " + (e.loaded / 1048576).toFixed(2) + "MB";
-                    progressCB(progress);
-                });
-            }
-            xhr.onload = function() {
-                if (xhr.readyState === xhr.DONE) {
-                    let data = xhr.response;
-                    if (xhr.status.toString().startsWith("4") || xhr.status.toString().startsWith("5")) {
-                        cb(-1);
-                        return;
-                    }
-                    try { data = JSON.parse(data) } catch(e) {}
-                    cb({
-                        data: data,
-                        headers: {
-                            "content-length": xhr.getResponseHeader("content-length")
-                        }
-                    });
+            try {
+                const response = await fetch(path, { method: opts.method });
+                const headers = {};
+                response.headers.forEach((v, k) => headers[k.toLowerCase()] = v);
+                if (opts.method === "HEAD") {
+                    cb({ headers });
+                    return;
                 }
+                if (!response.ok) {
+                    cb(-1);
+                    return;
+                }
+                if (!response.body) {
+                    let resData;
+                    if (opts.responseType === "arraybuffer") {
+                        resData = new Uint8Array(await response.arrayBuffer());
+                    } else {
+                        resData = await response.text();
+                        try { resData = JSON.parse(resData); } catch(e) {}
+                    }
+                    cb({ data: resData, headers });
+                    return;
+                }
+                const reader = response.body.getReader();
+                const contentLength = parseInt(response.headers.get('content-length')) || 0;
+                let received = 0;
+                const chunks = [];
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    received += value.length;
+                    if (progressCB instanceof Function) {
+                        const progress = contentLength ? " " + Math.floor(received / contentLength * 100) + "%" : " " + (received / 1048576).toFixed(2) + "MB";
+                        progressCB(progress);
+                    }
+                }
+                const blob = new Blob(chunks);
+                let resData;
+                if (opts.responseType === "arraybuffer") {
+                    resData = new Uint8Array(await blob.arrayBuffer());
+                } else {
+                    resData = await blob.text();
+                    try { resData = JSON.parse(resData); } catch(e) {}
+                }
+                cb({ data: resData, headers });
+            } catch(e) {
+                cb(-1);
             }
-            if (opts.responseType) xhr.responseType = opts.responseType;
-            xhr.onerror = () => cb(-1);
-            xhr.open(opts.method, path, true);
-            xhr.send();
         })
     }
     toData(data, rv) {
