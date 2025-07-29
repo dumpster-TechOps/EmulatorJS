@@ -118,6 +118,14 @@ Before pushing the script files onto your production server it is recommended to
 
 Read the [minifying](minify/README.md) documentation for more info.
 
+### Running Tests
+
+Execute the automated test suite with:
+
+```sh
+npm test
+```
+
 <br>
 
 ### Netplay Server
