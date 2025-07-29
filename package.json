@@ -18,20 +18,24 @@
     "minify": "node minify/minify.js",
     "build": "node build.js",
     "update": "node update.js",
-    "netplay": "node server/netplay-server.js"
+    "netplay": "node server/netplay-server.js",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@node-minify/clean-css": "^9.0.1",
     "@node-minify/core": "^9.0.2",
     "@node-minify/terser": "^9.0.1",
     "http-server": "^14.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "nipplejs": "^0.10.2",
     "node-7z": "^3.0.0",
     "node-fetch": "^3.3.2",
-    "nipplejs": "^0.10.2",
-    "socket.io": "^4.8.1",
-    "jsonwebtoken": "^9.0.2"
+    "socket.io": "^4.8.1"
   },
   "optionalDependencies": {
     "@emulatorjs/cores": "latest"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1"
   }
 }
