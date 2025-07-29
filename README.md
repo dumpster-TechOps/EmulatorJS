@@ -144,6 +144,8 @@ Set these environment variables before launching:
 - **`PORT`** – listening port (default `8080`)
 - **`API_KEY`** – secret for issuing JWT tokens
 - **`ADMIN_KEY`** – key required for the management API
+- **`ALLOW_PLAYER_JOIN`** – set to `false` to prevent new players from joining
+- **`ALLOW_VIEWER_JOIN`** – set to `false` to prevent new viewers from joining
 
 Example:
 
