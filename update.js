@@ -1,6 +1,5 @@
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
-import fetch from 'node-fetch';
 
 const args = process.argv.slice(2);
 const versionArg = args.find(arg => arg.startsWith('--ejs_v='));
@@ -12,7 +11,7 @@ let version;
 
 try {
     const packageJsonPath = path.resolve('package.json');
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
     version = packageJson.version;
 } catch(error) {
     console.error("Error reading version from package.json:", error.message);
@@ -26,18 +25,18 @@ const updateDependencies = async () => {
     const ejs_nipplejs = path.resolve('data', 'src', 'nipplejs.js');
 
     try {
-        fs.copyFileSync(socket_io, ejs_socket_io);
-        if (!fs.readFileSync(ejs_socket_io, 'utf8').endsWith('\n')) {
-            fs.appendFileSync(ejs_socket_io, '\n');
+        await fs.copyFile(socket_io, ejs_socket_io);
+        if (!(await fs.readFile(ejs_socket_io, 'utf8')).endsWith('\n')) {
+            await fs.appendFile(ejs_socket_io, '\n');
         }
     } catch(error) {
         console.error("Error updating socket.io:", error.message);
     }
 
     try {
-        fs.copyFileSync(nipplejs, ejs_nipplejs);
-        if (!fs.readFileSync(ejs_nipplejs, 'utf8').endsWith('\n')) {
-            fs.appendFileSync(ejs_nipplejs, '\n');
+        await fs.copyFile(nipplejs, ejs_nipplejs);
+        if (!(await fs.readFile(ejs_nipplejs, 'utf8')).endsWith('\n')) {
+            await fs.appendFile(ejs_nipplejs, '\n');
         }
     } catch(error) {
         console.error("Error updating nipplejs:", error.message);
@@ -47,32 +46,32 @@ const updateDependencies = async () => {
 
 const updateVersion = async (newVersion) => {
     const packageJsonPath = path.resolve('package.json');
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    const packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
     packageJson.version = newVersion;
-    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 4) + '\n');
+    await fs.writeFile(packageJsonPath, JSON.stringify(packageJson, null, 4) + '\n');
     console.log(`Updated version to ${newVersion} in package.json.`);
 
     const versionJsonPath = path.resolve('data', 'version.json');
-    const versionJson = JSON.parse(fs.readFileSync(versionJsonPath, 'utf8'));
+    const versionJson = JSON.parse(await fs.readFile(versionJsonPath, 'utf8'));
     versionJson.version = newVersion;
-    fs.writeFileSync(versionJsonPath, JSON.stringify(versionJson, null, 4) + '\n');
+    await fs.writeFile(versionJsonPath, JSON.stringify(versionJson, null, 4) + '\n');
     console.log(`Updated version to ${newVersion} in data/version.json.`);
 
     const coresJsonPath = path.resolve('data', 'cores', 'package.json');
-    const coresJson = JSON.parse(fs.readFileSync(coresJsonPath, 'utf8'));
+    const coresJson = JSON.parse(await fs.readFile(coresJsonPath, 'utf8'));
     coresJson.version = newVersion;
-    fs.writeFileSync(coresJsonPath, JSON.stringify(coresJson, null, 4) + '\n');
+    await fs.writeFile(coresJsonPath, JSON.stringify(coresJson, null, 4) + '\n');
     console.log(`Updated version to ${newVersion} in data/cores/package.json.`);
 
     const emulatorJsPath = path.resolve('data', 'src', 'emulator.js');
-    const emulatorJs = fs.readFileSync(emulatorJsPath, 'utf8');
+    const emulatorJs = await fs.readFile(emulatorJsPath, 'utf8');
     let updatedEmulatorJs = "";
     if (dev === "true") {
         updatedEmulatorJs = emulatorJs.replace(/this\.ejs_version\s*=\s*".*?";/, `this.ejs_version = "${newVersion}-dev";`);
     } else {
         updatedEmulatorJs = emulatorJs.replace(/this\.ejs_version\s*=\s*".*?";/, `this.ejs_version = "${newVersion}";`);
     }
-    fs.writeFileSync(emulatorJsPath, updatedEmulatorJs);
+    await fs.writeFile(emulatorJsPath, updatedEmulatorJs);
     console.log(`Updated version to ${newVersion} in data/src/emulator.js.`);
 };
 
@@ -91,8 +90,9 @@ const fetchContributors = async () => {
 
 const updateContributors = async () => {
     const contributors = await fetchContributors();
-    const ignoredContributors = JSON.parse(fs.readFileSync(path.resolve('docs', 'contributors.json'), 'utf8')).ignore;
-    const missingContributors = JSON.parse(fs.readFileSync(path.resolve('docs', 'contributors.json'), 'utf8')).missing;
+    const contributorsConfig = JSON.parse(await fs.readFile(path.resolve('docs', 'contributors.json'), 'utf8'));
+    const ignoredContributors = contributorsConfig.ignore;
+    const missingContributors = contributorsConfig.missing;
     if (!contributors) return;
     const sortedContributors = contributors
         .concat(missingContributors)
@@ -107,12 +107,12 @@ const updateContributors = async () => {
             contributorReadme += `<a href="${contributor.html_url}" target="_blank" title="${contributor.login} - Contributions: ${contributor.contributions}" alt="${contributor.login}"><img src="${contributor.avatar_url}&size=95" width="95px"></a>&nbsp;\n`;
         });
     const contributorsPath = path.resolve('docs', 'contributors.md');
-    const contributorsReadme = fs.readFileSync(contributorsPath, 'utf8');
+    const contributorsReadme = await fs.readFile(contributorsPath, 'utf8');
     const startLine = contributorsReadme.split('\n').findIndex(line => line.startsWith("<!-- Others -->")) + 1;
     const endLine = contributorsReadme.split('\n').findIndex(line => line.startsWith("<!-- Others End -->")) - 1;
     const updatedContributorsReadme = contributorsReadme.split('\n').filter((line, index) => index < startLine || index > endLine).join('\n');
     const newContributorsReadme = updatedContributorsReadme.replace("<!-- Others -->", `<!-- Others -->\n${contributorReadme}`);
-    fs.writeFileSync(contributorsPath, newContributorsReadme);
+    await fs.writeFile(contributorsPath, newContributorsReadme);
     console.log("Updated Contributors.md with new contributors.");
 }
 
