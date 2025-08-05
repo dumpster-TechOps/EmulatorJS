@@ -126,15 +126,18 @@ function checkAuth(req, query, admin = false) {
 }
 
 function readBody(req) {
+  // Reads and parses JSON request bodies. If parsing fails,
+  // the error is logged and an empty object is returned instead
+  // of throwing to the caller.
   return new Promise(resolve => {
     let data = '';
     req.on('data', chunk => (data += chunk));
     req.on('end', () => {
+      if (!data) return resolve({});
       try {
-        resolve(data ? JSON.parse(data) : {});
+        resolve(JSON.parse(data));
       } catch (err) {
-        // Log parse failures to aid debugging of malformed requests
-        console.error('Failed to parse request body:', err);
+        console.warn('Failed to parse request body:', err);
         resolve({});
       }
     });
@@ -143,7 +146,16 @@ function readBody(req) {
 
 const httpServer = createServer(async (req, res) => {
   const { pathname, query } = parse(req.url, true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // Restrict CORS headers based on configured allowed domains
+  const origin = req.headers.origin;
+  if (ALLOWED_DOMAINS.includes('*') || !origin || ALLOWED_DOMAINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  } else {
+    res.statusCode = 403;
+    res.end(JSON.stringify({ error: 'forbidden' }));
+    console.warn(`Blocked request from origin: ${origin}`);
+    return;
+  }
   res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'POST' && pathname === '/token') {
@@ -428,5 +440,5 @@ function startServer() {
   return httpServer;
 }
 
-// Export server utilities for external usage and testing.
-export { createRoom, joinRoom, updateState, rooms, startServer };
+
+export { createRoom, joinRoom, updateState, rooms, httpServer };
