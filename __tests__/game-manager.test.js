@@ -28,4 +28,22 @@ describe('GameManager screenshot', () => {
     expect(data).toEqual(new Uint8Array([1,2,3]));
     jest.useRealTimers();
   });
+
+  test('rejects if screenshot file not created', async () => {
+    jest.useFakeTimers();
+    const FS = {
+      unlink: jest.fn(),
+      stat: jest.fn(() => { throw new Error('ENOENT'); }),
+      readFile: jest.fn()
+    };
+    const gm = Object.create(global.window.EJS_GameManager.prototype);
+    gm.FS = FS;
+    gm.functions = { screenshot: jest.fn() };
+
+    const promise = gm.screenshot(100, 10);
+    jest.advanceTimersByTime(150);
+
+    await expect(promise).rejects.toThrow('screenshot timeout');
+    jest.useRealTimers();
+  });
 });

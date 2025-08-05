@@ -208,20 +208,36 @@ class EJS_GameManager {
             } catch(e) {}
         }, 5000)
     }
-    screenshot() {
+    /**
+     * Take a screenshot of the current frame.
+     * Polls the filesystem until the screenshot file is written or a timeout
+     * is reached. Rejects the promise if the file never appears.
+     *
+     * @param {number} [timeout=5000] - Maximum time in ms to wait for the file.
+     * @param {number} [interval=50] - Interval in ms between existence checks.
+     * @returns {Promise<Uint8Array>} Resolves with the screenshot data.
+     */
+    screenshot(timeout = 5000, interval = 50) {
         try {
             this.FS.unlink("screenshot.png");
         } catch(e) {}
         this.functions.screenshot();
-        return new Promise(resolve => {
+        return new Promise((resolve, reject) => {
+            const start = Date.now();
             const check = setInterval(() => {
                 try {
                     this.FS.stat("/screenshot.png");
                     const data = this.FS.readFile("/screenshot.png");
                     clearInterval(check);
                     resolve(data);
-                } catch (e) {}
-            }, 50);
+                } catch (e) {
+                    if (Date.now() - start >= timeout) {
+                        clearInterval(check);
+                        console.warn("Screenshot not generated within timeout");
+                        reject(new Error("screenshot timeout"));
+                    }
+                }
+            }, interval);
         });
     }
     quickSave(slot) {
