@@ -1,7 +1,7 @@
 'use strict';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { parse, fileURLToPath } from 'url';
+import { parse } from 'url';
 import jwt from 'jsonwebtoken';
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
@@ -11,6 +11,11 @@ const ALLOW_PLAYER_JOIN = process.env.ALLOW_PLAYER_JOIN !== 'false';
 const ALLOW_VIEWER_JOIN = process.env.ALLOW_VIEWER_JOIN !== 'false';
 const ICE_SERVERS = process.env.ICE_SERVERS ? JSON.parse(process.env.ICE_SERVERS) : [];
 const ALLOWED_DOMAINS = process.env.ALLOWED_DOMAINS ? process.env.ALLOWED_DOMAINS.split(',') : ['*'];
+const DEBUG = process.env.NETPLAY_DEBUG === 'true';
+
+function debugLog(...args) {
+  if (DEBUG) console.log(...args);
+}
 
 /**
  * Room structure
@@ -53,6 +58,7 @@ function createRoom(id, opts = {}) {
     state: null,
     stateVersion: 0
   });
+  debugLog(`Room created: ${id}`);
 }
 
 function joinRoom(id, socket, { spectator = false, password = '', name = '', guid = '' } = {}) {
@@ -80,6 +86,7 @@ function joinRoom(id, socket, { spectator = false, password = '', name = '', gui
     room.guidMap.set(guid, { num: playerNum, name, socketId: socket.id, disconnectedAt: null });
   }
   if (!room.stats.has(guid)) room.stats.set(guid, { latencies: [], lastSeq: 0, lost: 0 });
+  debugLog(`Socket ${socket.id} joined room ${id} as ${spectator ? 'viewer' : 'player'}`);
   return { player: playerNum, spectator: false, name, guid };
 }
 
@@ -104,8 +111,11 @@ function verifyToken(token) {
 function checkAuth(req, query, admin = false) {
   if (admin) {
     const key = req.headers['x-admin-key'] || query.adminKey;
-    if (ADMIN_KEY && key === ADMIN_KEY) return true;
-    return false;
+    if (ADMIN_KEY) {
+      return key === ADMIN_KEY;
+    }
+    // If no admin key is configured, allow access
+    return true;
   }
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.startsWith('Bearer ')
