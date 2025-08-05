@@ -122,7 +122,9 @@ function readBody(req) {
     req.on('end', () => {
       try {
         resolve(data ? JSON.parse(data) : {});
-      } catch {
+      } catch (err) {
+        // Log parse failures to aid debugging of malformed requests
+        console.error('Failed to parse request body:', err);
         resolve({});
       }
     });
@@ -413,6 +415,8 @@ function startServer() {
   httpServer.listen(PORT, () => {
     console.log(`Netplay server listening on ${PORT}`);
   });
+  return httpServer;
 }
 
-export { createRoom, joinRoom, updateState, rooms };
+// Export server utilities for external usage and testing.
+export { createRoom, joinRoom, updateState, rooms, startServer };
