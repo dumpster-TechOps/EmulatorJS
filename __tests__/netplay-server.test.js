@@ -1,8 +1,19 @@
-import { createRoom, joinRoom, updateState, rooms } from '../server/netplay-server.js';
+import { createRoom, joinRoom, updateState, rooms, startServer } from '../server/netplay-server.js';
 
 describe('netplay-server room lifecycle', () => {
+  let server;
   afterEach(() => {
     rooms.clear();
+    if (server && server.listening) {
+      server.close();
+      server = null;
+    }
+  });
+
+  test('startServer starts listening', async () => {
+    server = startServer();
+    await new Promise(res => server.on('listening', res));
+    expect(server.listening).toBe(true);
   });
 
   test('creates a room with given id', () => {
